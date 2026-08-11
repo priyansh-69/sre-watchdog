@@ -1,0 +1,35 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "agentic-sre"
+version = "0.1.0"
+description = "An autonomous, LLM-agnostic SRE middleware that intercepts backend crashes and generates root cause analysis."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Priyansh Kandwal" }
+]
+classifiers = [
+    "Development Status :: 3 - Alpha",
+    "Intended Audience :: Developers",
+    "Framework :: FastAPI",
+    "Topic :: Software Development :: Libraries :: Application Frameworks",
+    "Programming Language :: Python :: 3",
+]
+dependencies = [
+    "fastapi>=0.100.0",
+    "starlette>=0.27.0",
+    "httpx>=0.25.0",
+    "google-genai>=0.3.0",
+    "chromadb>=0.4.0",
+]
+
+[project.urls]
+Documentation = "https://github.com/yourusername/agentic-sre#readme"
+Source = "https://github.com/yourusername/agentic-sre"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/agentic_sre"]
