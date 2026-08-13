@@ -1,7 +1,7 @@
 """Regex-based PII & sensitive credential sanitizer for Agentic-SRE."""
 
 import re
-from typing import Any, Dict
+from typing import Any, Dict, Optional, Set
 
 
 class Sanitizer:
@@ -9,25 +9,25 @@ class Sanitizer:
 
     # Key matching pattern for sensitive keys in dictionaries
     SENSITIVE_KEY_PATTERN = re.compile(
-        r"(?i)^(.*)?(password|secret|token|api[_\-]?key|apikey|auth|bearer|cookie|private[_\-]?key)(.*)?$"
+        r"(?i)^(.*)?(password|passwd|secret|token|api[_\-]?key|apikey|auth|bearer|cookie|set-cookie|proxy-authorization|session|access[_\-]?token|refresh[_\-]?token|private[_\-]?key|signature|credential)(.*)?$"
     )
 
     # Patterns for text redaction: list of (compiled_regex, replacement_string)
     PATTERNS = [
-        # Bearer Tokens (e.g. Bearer eyJ... or Bearer token_xyz)
+        # Bearer & Basic Auth Header Tokens (e.g. Bearer eyJ... or Basic dXNl...)
         (
-            re.compile(r"(?i)\bBearer\s+[A-Za-z0-9\-\._~\+\/]+=*"),
-            "Bearer [REDACTED]",
+            re.compile(r"(?i)\b(Bearer|Basic)\s+[A-Za-z0-9\-\._~\+\/]+=*"),
+            r"\1 [REDACTED]",
         ),
         # JWT Tokens (eyJ...)
         (
             re.compile(r"\beyJ[A-Za-z0-9_-]+\.eyJ[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b"),
             "[REDACTED]",
         ),
-        # Key-Value assignments (e.g., password="secret", api_key: '12345', token=xyz)
+        # Key-Value assignments & JSON fields (handles quoted strings with spaces)
         (
             re.compile(
-                r"(?i)\b(password|secret|token|api[_\-]?key|auth|bearer)\s*[:=]\s*['\"]?([^\s'\";,]+)['\"]?"
+                r"(?i)\b(password|passwd|secret|token|api[_\-]?key|apikey|auth|bearer|session|access[_\-]?token)\s*[:=]\s*(?:'[^']*'|\"[^\"]*\"|[^\s'\";,]+)"
             ),
             r"\1=[REDACTED]",
         ),
@@ -83,6 +83,49 @@ class Sanitizer:
                 sanitized[key] = self.redact(value)
             elif isinstance(value, dict):
                 sanitized[key] = self.sanitize_dict(value)
+            elif isinstance(value, list):
+                sanitized[key] = [
+                    self.sanitize_dict(item) if isinstance(item, dict)
+                    else self.redact(item) if isinstance(item, str)
+                    else item
+                    for item in value
+                ]
+            else:
+                sanitized[key] = value
+        return sanitized
+
+    def sanitize_dict_allowlist(
+        self, data: Dict[str, Any], allowlist: Optional[Set[str]] = None
+    ) -> Dict[str, Any]:
+        """Recursively sanitizes dictionary keys against a strict allowlist.
+
+        Non-allowlisted keys are replaced with [REDACTED] to enforce data minimization.
+
+        Args:
+            data: Input dictionary (e.g. request headers).
+            allowlist: Optional set of lowercased safe keys.
+
+        Returns:
+            Sanitized dictionary containing only allowlisted safe keys.
+        """
+        sanitized: Dict[str, Any] = {}
+        for key, value in data.items():
+            key_lower = str(key).lower()
+            if allowlist is not None and key_lower not in allowlist:
+                sanitized[key] = "[REDACTED]"
+            elif self.SENSITIVE_KEY_PATTERN.match(key_lower):
+                sanitized[key] = "[REDACTED]"
+            elif isinstance(value, str):
+                sanitized[key] = self.redact(value)
+            elif isinstance(value, dict):
+                sanitized[key] = self.sanitize_dict_allowlist(value, allowlist=allowlist)
+            elif isinstance(value, list):
+                sanitized[key] = [
+                    self.sanitize_dict_allowlist(item, allowlist=allowlist) if isinstance(item, dict)
+                    else self.redact(item) if isinstance(item, str)
+                    else item
+                    for item in value
+                ]
             else:
                 sanitized[key] = value
         return sanitized

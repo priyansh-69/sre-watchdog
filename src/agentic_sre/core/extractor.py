@@ -8,6 +8,55 @@ from starlette.requests import Request
 from agentic_sre.core.sanitizer import Sanitizer
 
 
+MAX_STACK_TRACE_CHARS = 8000
+MAX_STACK_TRACE_LINES = 150
+MAX_EXCEPTION_MSG_CHARS = 1000
+
+# Explicit safe header allowlist for structured request data minimization
+SAFE_HEADER_ALLOWLIST = {
+    "host",
+    "user-agent",
+    "content-type",
+    "accept",
+    "accept-encoding",
+    "accept-language",
+    "x-request-id",
+    "x-correlation-id",
+    "x-forwarded-for",
+    "x-forwarded-proto",
+}
+
+
+def truncate_stack_trace(
+    stack_trace: str, max_chars: int = MAX_STACK_TRACE_CHARS, max_lines: int = MAX_STACK_TRACE_LINES
+) -> str:
+    """Intelligently truncates oversized stack traces while preserving top and bottom frames.
+
+    Args:
+        stack_trace: Input stack trace string.
+        max_chars: Maximum character limit. Defaults to 8000.
+        max_lines: Maximum line limit. Defaults to 150.
+
+    Returns:
+        Truncated stack trace string preserving entry frames and innermost failing frames.
+    """
+    if not stack_trace:
+        return ""
+
+    lines = stack_trace.splitlines()
+    if len(lines) > max_lines or len(stack_trace) > max_chars:
+        head_lines = lines[:30]
+        tail_lines = lines[-70:]
+        omitted_count = len(lines) - 100
+        truncated_msg = f"\n\n... [TRUNCATED {max(omitted_count, 1)} STACK TRACE LINES TO PRESERVE CONTEXT WINDOW] ...\n\n"
+        stack_trace = "\n".join(head_lines) + truncated_msg + "\n".join(tail_lines)
+
+        if len(stack_trace) > max_chars:
+            stack_trace = stack_trace[: max_chars - 100] + "\n\n... [TRUNCATED OVERSIZED STACK TRACE] ..."
+
+    return stack_trace
+
+
 class Extractor:
     """Extractor class for capturing structured crash context from exceptions and HTTP requests."""
 
@@ -46,19 +95,27 @@ class Extractor:
         # Format full raw stack trace string
         raw_stack_trace = "".join(traceback.format_exception(type(exc), exc, tb))
         sanitized_stack_trace = self.sanitizer.redact(raw_stack_trace)
+        truncated_stack_trace = truncate_stack_trace(sanitized_stack_trace)
 
-        # Extract and sanitize headers
+        raw_msg = str(exc)
+        if len(raw_msg) > MAX_EXCEPTION_MSG_CHARS:
+            raw_msg = raw_msg[:MAX_EXCEPTION_MSG_CHARS] + " ... [TRUNCATED]"
+        sanitized_msg = self.sanitizer.redact(raw_msg)
+
+        # Extract and sanitize headers using Hybrid Allowlist Data Minimization
         raw_headers = dict(request.headers)
-        sanitized_headers = self.sanitizer.sanitize_dict(raw_headers)
+        sanitized_headers = self.sanitizer.sanitize_dict_allowlist(
+            raw_headers, allowlist=SAFE_HEADER_ALLOWLIST
+        )
 
         return {
             "method": request.method,
-            "url": str(request.url),
+            "url": self.sanitizer.redact(str(request.url)),
             "headers": sanitized_headers,
             "exception_type": type(exc).__name__,
-            "exception_message": self.sanitizer.redact(str(exc)),
+            "exception_message": sanitized_msg,
             "file_name": file_name,
             "line_number": line_number,
             "function_name": function_name,
-            "stack_trace": sanitized_stack_trace,
+            "stack_trace": truncated_stack_trace,
         }
