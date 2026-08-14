@@ -1,0 +1,15 @@
+# Environments
+.env
+.venv/
+venv/
+__pycache__/
+
+# Build files
+dist/
+*.egg-info/
+
+# Local testing and experiments
+scratch/.chroma_db/
+.DS_Store
+.chroma_db/
+.DS_Store

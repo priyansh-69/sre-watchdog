@@ -47,13 +47,28 @@ class Sanitizer:
             re.compile(r"\b[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}\b"),
             "[REDACTED]",
         ),
+        # Adversarial Prompt Injection Patterns
+        (
+            re.compile(
+                r"(?i)\b(?:ignore|disregard|forget|override)\s+(?:all\s+)?(?:previous|prior|above)\s+(?:instructions|commands|prompts|rules)\b"
+            ),
+            "[PROMPT_INJECTION_ATTEMPT_REDACTED]",
+        ),
+        (
+            re.compile(
+                r"(?i)\b(?:you\s+are\s+now(?:\s+a)?|act\s+as\s+a)\s+(?:DAN|jailbroken|unrestricted|attacker|root|admin)\b"
+            ),
+            "[PROMPT_INJECTION_ATTEMPT_REDACTED]",
+        ),
     ]
 
-    def redact(self, text: str) -> str:
+    def redact(self, text: Any) -> str:
         """Scrubs sensitive data (bearer tokens, API keys, passwords, credit cards, emails) from text.
 
+        Handles string, bytes, surrogates, and arbitrary objects safely.
+
         Args:
-            text: Input string (e.g., stack trace string or log message).
+            text: Input string, bytes, or object.
 
         Returns:
             Sanitized string with sensitive information replaced by [REDACTED].
@@ -61,20 +76,42 @@ class Sanitizer:
         if not text:
             return ""
 
-        sanitized = text
+        if isinstance(text, bytes):
+            text_str = text.decode("utf-8", errors="replace")
+        elif not isinstance(text, str):
+            try:
+                text_str = str(text)
+            except Exception:
+                text_str = "<unprintable object>"
+        else:
+            text_str = text
+
+        # Replace invalid unicode surrogates safely
+        sanitized = text_str.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+
         for pattern, replacement in self.PATTERNS:
-            sanitized = pattern.sub(replacement, sanitized)
+            try:
+                sanitized = pattern.sub(replacement, sanitized)
+            except Exception:
+                pass
         return sanitized
 
-    def sanitize_dict(self, data: Dict[str, Any]) -> Dict[str, Any]:
+    def sanitize_dict(
+        self, data: Dict[str, Any], depth: int = 0, max_depth: int = 15
+    ) -> Dict[str, Any]:
         """Recursively redacts sensitive key-value pairs and string values in a dictionary.
 
         Args:
             data: Input dictionary (e.g., request headers, query parameters).
+            depth: Current recursion depth. Defaults to 0.
+            max_depth: Maximum recursion depth before truncating. Defaults to 15.
 
         Returns:
             Sanitized dictionary with sensitive values replaced by [REDACTED].
         """
+        if depth > max_depth:
+            return {"[MAX_DEPTH_EXCEEDED]": "[TRUNCATED_DEEP_NESTING]"}
+
         sanitized: Dict[str, Any] = {}
         for key, value in data.items():
             if self.SENSITIVE_KEY_PATTERN.match(str(key)):
@@ -82,11 +119,13 @@ class Sanitizer:
             elif isinstance(value, str):
                 sanitized[key] = self.redact(value)
             elif isinstance(value, dict):
-                sanitized[key] = self.sanitize_dict(value)
+                sanitized[key] = self.sanitize_dict(value, depth=depth + 1, max_depth=max_depth)
             elif isinstance(value, list):
                 sanitized[key] = [
-                    self.sanitize_dict(item) if isinstance(item, dict)
-                    else self.redact(item) if isinstance(item, str)
+                    self.sanitize_dict(item, depth=depth + 1, max_depth=max_depth)
+                    if isinstance(item, dict)
+                    else self.redact(item)
+                    if isinstance(item, str)
                     else item
                     for item in value
                 ]
@@ -95,7 +134,7 @@ class Sanitizer:
         return sanitized
 
     def sanitize_dict_allowlist(
-        self, data: Dict[str, Any], allowlist: Optional[Set[str]] = None
+        self, data: Dict[str, Any], allowlist: Optional[Set[str]] = None, depth: int = 0, max_depth: int = 15
     ) -> Dict[str, Any]:
         """Recursively sanitizes dictionary keys against a strict allowlist.
 
@@ -104,10 +143,15 @@ class Sanitizer:
         Args:
             data: Input dictionary (e.g. request headers).
             allowlist: Optional set of lowercased safe keys.
+            depth: Current recursion depth. Defaults to 0.
+            max_depth: Maximum recursion depth before truncating. Defaults to 15.
 
         Returns:
             Sanitized dictionary containing only allowlisted safe keys.
         """
+        if depth > max_depth:
+            return {"[MAX_DEPTH_EXCEEDED]": "[TRUNCATED_DEEP_NESTING]"}
+
         sanitized: Dict[str, Any] = {}
         for key, value in data.items():
             key_lower = str(key).lower()
@@ -118,11 +162,17 @@ class Sanitizer:
             elif isinstance(value, str):
                 sanitized[key] = self.redact(value)
             elif isinstance(value, dict):
-                sanitized[key] = self.sanitize_dict_allowlist(value, allowlist=allowlist)
+                sanitized[key] = self.sanitize_dict_allowlist(
+                    value, allowlist=allowlist, depth=depth + 1, max_depth=max_depth
+                )
             elif isinstance(value, list):
                 sanitized[key] = [
-                    self.sanitize_dict_allowlist(item, allowlist=allowlist) if isinstance(item, dict)
-                    else self.redact(item) if isinstance(item, str)
+                    self.sanitize_dict_allowlist(
+                        item, allowlist=allowlist, depth=depth + 1, max_depth=max_depth
+                    )
+                    if isinstance(item, dict)
+                    else self.redact(item)
+                    if isinstance(item, str)
                     else item
                     for item in value
                 ]

@@ -92,12 +92,21 @@ class Extractor:
             line_number = 0
             function_name = "unknown"
 
-        # Format full raw stack trace string
-        raw_stack_trace = "".join(traceback.format_exception(type(exc), exc, tb))
+        # Format full raw stack trace string safely
+        try:
+            raw_stack_trace = "".join(traceback.format_exception(type(exc), exc, tb))
+        except Exception as format_err:
+            raw_stack_trace = f"Traceback formatting failed ({type(format_err).__name__}: {format_err})"
+
         sanitized_stack_trace = self.sanitizer.redact(raw_stack_trace)
         truncated_stack_trace = truncate_stack_trace(sanitized_stack_trace)
 
-        raw_msg = str(exc)
+        # Safely convert exception message string (handles broken __str__ methods)
+        try:
+            raw_msg = str(exc)
+        except Exception:
+            raw_msg = f"<{type(exc).__name__} object with broken __str__ implementation>"
+
         if len(raw_msg) > MAX_EXCEPTION_MSG_CHARS:
             raw_msg = raw_msg[:MAX_EXCEPTION_MSG_CHARS] + " ... [TRUNCATED]"
         sanitized_msg = self.sanitizer.redact(raw_msg)
@@ -108,9 +117,21 @@ class Extractor:
             raw_headers, allowlist=SAFE_HEADER_ALLOWLIST
         )
 
+        # Extract distributed tracing correlation ID
+        headers_lower = {k.lower(): v for k, v in raw_headers.items()}
+        correlation_id = (
+            headers_lower.get("x-request-id")
+            or headers_lower.get("x-correlation-id")
+            or headers_lower.get("traceparent")
+            or headers_lower.get("x-datadog-trace-id")
+            or headers_lower.get("x-b3-traceid")
+            or "none"
+        )
+
         return {
             "method": request.method,
             "url": self.sanitizer.redact(str(request.url)),
+            "correlation_id": self.sanitizer.redact(correlation_id),
             "headers": sanitized_headers,
             "exception_type": type(exc).__name__,
             "exception_message": sanitized_msg,
