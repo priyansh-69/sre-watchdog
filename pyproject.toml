@@ -34,6 +34,14 @@ test = [
     "pytest>=7.0.0",
     "pytest-asyncio>=0.21.0",
 ]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-asyncio>=0.21.0",
+    "black>=23.0.0",
+    "isort>=5.12.0",
+    "mypy>=1.0.0",
+    "bandit>=1.7.0",
+]
 
 [project.urls]
 Documentation = "https://github.com/yourusername/agentic-sre#readme"
@@ -45,3 +53,17 @@ packages = ["src/agentic_sre"]
 [tool.pytest.ini_options]
 pythonpath = ["src"]
 asyncio_mode = "auto"
+testpaths = ["tests", "scratch"]
+
+[tool.isort]
+profile = "black"
+line_length = 88
+
+[tool.black]
+line-length = 88
+target-version = ['py39', 'py310', 'py311', 'py312', 'py313']
+
+[tool.mypy]
+strict = true
+warn_unused_configs = true
+files = ["src/agentic_sre"]

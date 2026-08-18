@@ -87,12 +87,14 @@ class Sanitizer:
             text_str = text
 
         # Replace invalid unicode surrogates safely
-        sanitized = text_str.encode("utf-8", errors="replace").decode("utf-8", errors="replace")
+        sanitized = text_str.encode("utf-8", errors="replace").decode(
+            "utf-8", errors="replace"
+        )
 
         for pattern, replacement in self.PATTERNS:
             try:
                 sanitized = pattern.sub(replacement, sanitized)
-            except Exception:
+            except Exception:  # nosec B110
                 pass
         return sanitized
 
@@ -119,14 +121,16 @@ class Sanitizer:
             elif isinstance(value, str):
                 sanitized[key] = self.redact(value)
             elif isinstance(value, dict):
-                sanitized[key] = self.sanitize_dict(value, depth=depth + 1, max_depth=max_depth)
+                sanitized[key] = self.sanitize_dict(
+                    value, depth=depth + 1, max_depth=max_depth
+                )
             elif isinstance(value, list):
                 sanitized[key] = [
-                    self.sanitize_dict(item, depth=depth + 1, max_depth=max_depth)
-                    if isinstance(item, dict)
-                    else self.redact(item)
-                    if isinstance(item, str)
-                    else item
+                    (
+                        self.sanitize_dict(item, depth=depth + 1, max_depth=max_depth)
+                        if isinstance(item, dict)
+                        else self.redact(item) if isinstance(item, str) else item
+                    )
                     for item in value
                 ]
             else:
@@ -134,7 +138,11 @@ class Sanitizer:
         return sanitized
 
     def sanitize_dict_allowlist(
-        self, data: Dict[str, Any], allowlist: Optional[Set[str]] = None, depth: int = 0, max_depth: int = 15
+        self,
+        data: Dict[str, Any],
+        allowlist: Optional[Set[str]] = None,
+        depth: int = 0,
+        max_depth: int = 15,
     ) -> Dict[str, Any]:
         """Recursively sanitizes dictionary keys against a strict allowlist.
 
@@ -167,13 +175,16 @@ class Sanitizer:
                 )
             elif isinstance(value, list):
                 sanitized[key] = [
-                    self.sanitize_dict_allowlist(
-                        item, allowlist=allowlist, depth=depth + 1, max_depth=max_depth
+                    (
+                        self.sanitize_dict_allowlist(
+                            item,
+                            allowlist=allowlist,
+                            depth=depth + 1,
+                            max_depth=max_depth,
+                        )
+                        if isinstance(item, dict)
+                        else self.redact(item) if isinstance(item, str) else item
                     )
-                    if isinstance(item, dict)
-                    else self.redact(item)
-                    if isinstance(item, str)
-                    else item
                     for item in value
                 ]
             else:
