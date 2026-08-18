@@ -1,10 +1,10 @@
 """ChromaDB local vector store for Agentic-SRE historical crash memory."""
 
 import asyncio
-from concurrent.futures import ThreadPoolExecutor
 import logging
 import os
 import uuid
+from concurrent.futures import ThreadPoolExecutor
 from typing import Any, Dict, List, Optional
 
 logger = logging.getLogger("agentic_sre")
@@ -19,7 +19,12 @@ DEFAULT_MAX_RECORDS = 5000
 class MemoryStore:
     """Local vector store for crash memory using ChromaDB."""
 
-    def __init__(self, db_path: str = DEFAULT_DB_PATH, max_workers: int = 3, max_records: int = DEFAULT_MAX_RECORDS) -> None:
+    def __init__(
+        self,
+        db_path: str = DEFAULT_DB_PATH,
+        max_workers: int = 3,
+        max_records: int = DEFAULT_MAX_RECORDS,
+    ) -> None:
         """Initializes MemoryStore with persistent storage, a Bulkhead executor, and record eviction bounds.
 
         Args:
@@ -84,10 +89,15 @@ class MemoryStore:
             )
             return self._collection
         except Exception as exc:
-            logger.error(f"[Agentic-SRE] Fail-silent error initializing ChromaDB: {exc}", exc_info=True)
+            logger.error(
+                f"[Agentic-SRE] Fail-silent error initializing ChromaDB: {exc}",
+                exc_info=True,
+            )
             return None
 
-    async def search_similar_crashes(self, stack_trace_str: str, limit: int = 3) -> List[Dict[str, Any]]:
+    async def search_similar_crashes(
+        self, stack_trace_str: str, limit: int = 3
+    ) -> List[Dict[str, Any]]:
         """Searches ChromaDB for historically similar stack traces.
 
         Args:
@@ -117,8 +127,16 @@ class MemoryStore:
             similar_crashes: List[Dict[str, Any]] = []
             if results and results.get("metadatas") and len(results["metadatas"]) > 0:
                 metadatas_list = results["metadatas"][0]
-                distances_list = results.get("distances", [[]])[0] if results.get("distances") else []
-                documents_list = results.get("documents", [[]])[0] if results.get("documents") else []
+                distances_list = (
+                    results.get("distances", [[]])[0]
+                    if results.get("distances")
+                    else []
+                )
+                documents_list = (
+                    results.get("documents", [[]])[0]
+                    if results.get("documents")
+                    else []
+                )
 
                 for idx, meta in enumerate(metadatas_list):
                     item = dict(meta) if meta else {}
@@ -131,7 +149,10 @@ class MemoryStore:
             return similar_crashes
 
         except Exception as exc:
-            logger.error(f"[Agentic-SRE] Fail-silent error searching ChromaDB: {exc}", exc_info=True)
+            logger.error(
+                f"[Agentic-SRE] Fail-silent error searching ChromaDB: {exc}",
+                exc_info=True,
+            )
             return []
 
     async def store_crash(self, stack_trace_str: str, ai_rca: Dict[str, Any]) -> None:
@@ -168,11 +189,17 @@ class MemoryStore:
                 try:
                     count = await self._run_in_bulkhead(collection.count)
                     if count >= self.max_records:
-                        oldest = await self._run_in_bulkhead(lambda: collection.get(limit=1))
+                        oldest = await self._run_in_bulkhead(
+                            lambda: collection.get(limit=1)
+                        )
                         if oldest and oldest.get("ids"):
-                            await self._run_in_bulkhead(lambda: collection.delete(ids=[oldest["ids"][0]]))
+                            await self._run_in_bulkhead(
+                                lambda: collection.delete(ids=[oldest["ids"][0]])
+                            )
                 except Exception as evict_err:
-                    logger.warning(f"[Agentic-SRE] Vector store eviction check failed: {evict_err}")
+                    logger.warning(
+                        f"[Agentic-SRE] Vector store eviction check failed: {evict_err}"
+                    )
 
                 await self._run_in_bulkhead(
                     lambda: collection.add(
@@ -182,13 +209,18 @@ class MemoryStore:
                         ids=[record_id],
                     )
                 )
-                logger.info(f"[Agentic-SRE] Stored crash record {record_id} into ChromaDB vector store.")
+                logger.info(
+                    f"[Agentic-SRE] Stored crash record {record_id} into ChromaDB vector store."
+                )
                 break
             except Exception as exc:
                 if "locked" in str(exc).lower() and attempt < max_retries:
                     await asyncio.sleep(0.1 * (attempt + 1))
                     continue
-                logger.error(f"[Agentic-SRE] Fail-silent error storing crash in ChromaDB: {exc}", exc_info=True)
+                logger.error(
+                    f"[Agentic-SRE] Fail-silent error storing crash in ChromaDB: {exc}",
+                    exc_info=True,
+                )
                 break
 
     def close(self) -> None:

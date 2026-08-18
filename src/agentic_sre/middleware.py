@@ -17,10 +17,7 @@ from agentic_sre.ai.gemini import GeminiProvider
 from agentic_sre.ai.vector_store import MemoryStore
 from agentic_sre.core.deduplicator import CrashDeduplicator
 from agentic_sre.core.extractor import Extractor
-from agentic_sre.notifications.webhooks import (
-    close_shared_http_client,
-    dispatch_alerts,
-)
+from agentic_sre.notifications.webhooks import close_shared_http_client, dispatch_alerts
 
 logger = logging.getLogger("agentic_sre")
 
@@ -34,7 +31,9 @@ DEFAULT_MAX_BACKGROUND_TASKS = 100
 
 
 async def _default_investigate_task(
-    exc: Exception, request: Request, pre_extracted_context: Optional[dict[str, Any]] = None
+    exc: Exception,
+    request: Request,
+    pre_extracted_context: Optional[dict[str, Any]] = None,
 ) -> None:
     """Background task executing non-blocking AI root-cause analysis and alert dispatch.
 
@@ -67,7 +66,9 @@ async def _default_investigate_task(
 
         # RAG Search: Retrieve similar historical crashes from ChromaDB
         memory_store = _DEFAULT_MEMORY_STORE
-        historical_crashes = await memory_store.search_similar_crashes(stack_trace_str, limit=3)
+        historical_crashes = await memory_store.search_similar_crashes(
+            stack_trace_str, limit=3
+        )
         crash_context["historical_context"] = historical_crashes
 
         # AI Root Cause Analysis via Strategy Pattern (informed by RAG memory)
@@ -102,7 +103,13 @@ class AgenticSREMiddleware(BaseHTTPMiddleware):
         deduplicator: Optional CrashDeduplicator instance for alert throttling.
     """
 
-    __slots__ = ("enabled", "investigate_coro", "_background_tasks", "max_background_tasks", "deduplicator")
+    __slots__ = (
+        "enabled",
+        "investigate_coro",
+        "_background_tasks",
+        "max_background_tasks",
+        "deduplicator",
+    )
 
     def __init__(
         self,
@@ -215,9 +222,13 @@ class AgenticSREMiddleware(BaseHTTPMiddleware):
         )
         tasks = list(self._background_tasks)
         try:
-            await asyncio.wait_for(asyncio.gather(*tasks, return_exceptions=True), timeout=timeout)
+            await asyncio.wait_for(
+                asyncio.gather(*tasks, return_exceptions=True), timeout=timeout
+            )
         except asyncio.TimeoutError:
-            logger.warning("[Agentic-SRE] Shutdown timeout reached. Cancelling remaining pending tasks...")
+            logger.warning(
+                "[Agentic-SRE] Shutdown timeout reached. Cancelling remaining pending tasks..."
+            )
             for task in tasks:
                 if not task.done():
                     task.cancel()

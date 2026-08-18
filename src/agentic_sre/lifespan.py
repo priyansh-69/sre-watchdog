@@ -1,7 +1,7 @@
 """Lifespan context manager for Agentic-SRE task flushing on server shutdown."""
 
-from contextlib import asynccontextmanager
 import logging
+from contextlib import asynccontextmanager
 from typing import Any, AsyncGenerator
 
 from agentic_sre.notifications.webhooks import close_shared_http_client
@@ -18,5 +18,7 @@ async def sre_lifespan(app: Any) -> AsyncGenerator[None, None]:
         app.add_middleware(AgenticSREMiddleware)
     """
     yield
-    logger.info("[Agentic-SRE] Lifespan shutdown: Closing shared HTTP client connections...")
+    logger.info(
+        "[Agentic-SRE] Lifespan shutdown: Closing shared HTTP client connections..."
+    )
     await close_shared_http_client()

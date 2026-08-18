@@ -3,7 +3,9 @@
 from typing import Any, Dict
 
 
-def format_slack_payload(crash_context: Dict[str, Any], ai_rca: Dict[str, Any]) -> Dict[str, Any]:
+def format_slack_payload(
+    crash_context: Dict[str, Any], ai_rca: Dict[str, Any]
+) -> Dict[str, Any]:
     """Formats crash metadata and AI root cause analysis into a Slack Block Kit payload.
 
     Args:
@@ -13,7 +15,9 @@ def format_slack_payload(crash_context: Dict[str, Any], ai_rca: Dict[str, Any]) 
     Returns:
         Dict representing Slack Block Kit message structure.
     """
-    endpoint_str = f"{crash_context.get('method', 'GET')} {crash_context.get('url', 'unknown')}"
+    endpoint_str = (
+        f"{crash_context.get('method', 'GET')} {crash_context.get('url', 'unknown')}"
+    )
     exception_str = f"{crash_context.get('exception_type', 'Exception')}: {crash_context.get('exception_message', '')}"
     failing_loc = (
         f"{crash_context.get('file_name', 'unknown')}:"
@@ -47,7 +51,10 @@ def format_slack_payload(crash_context: Dict[str, Any], ai_rca: Dict[str, Any]) 
         },
         {
             "type": "section",
-            "text": {"type": "mrkdwn", "text": f"*📁 Failing Location:*\n`{failing_loc}`"},
+            "text": {
+                "type": "mrkdwn",
+                "text": f"*📁 Failing Location:*\n`{failing_loc}`",
+            },
         },
         {"type": "divider"},
         {
@@ -79,7 +86,9 @@ def format_slack_payload(crash_context: Dict[str, Any], ai_rca: Dict[str, Any]) 
     return {"blocks": blocks}
 
 
-def format_discord_payload(crash_context: Dict[str, Any], ai_rca: Dict[str, Any]) -> Dict[str, Any]:
+def format_discord_payload(
+    crash_context: Dict[str, Any], ai_rca: Dict[str, Any]
+) -> Dict[str, Any]:
     """Formats crash metadata and AI root cause analysis into a Discord Embed payload.
 
     Args:
@@ -89,7 +98,9 @@ def format_discord_payload(crash_context: Dict[str, Any], ai_rca: Dict[str, Any]
     Returns:
         Dict representing Discord webhook embed payload.
     """
-    endpoint_str = f"{crash_context.get('method', 'GET')} {crash_context.get('url', 'unknown')}"
+    endpoint_str = (
+        f"{crash_context.get('method', 'GET')} {crash_context.get('url', 'unknown')}"
+    )
     exception_str = f"{crash_context.get('exception_type', 'Exception')}: {crash_context.get('exception_message', '')}"
     failing_loc = (
         f"{crash_context.get('file_name', 'unknown')}:"

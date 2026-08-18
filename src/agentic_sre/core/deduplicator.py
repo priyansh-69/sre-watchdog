@@ -3,9 +3,9 @@
 Prevents alert fatigue and LLM API cost explosion during outage spikes.
 """
 
-from collections import OrderedDict
 import hashlib
 import time
+from collections import OrderedDict
 from typing import Any, Dict, Optional
 
 
@@ -78,7 +78,8 @@ class CrashDeduplicator:
     def _cleanup_expired(self, current_time: float) -> None:
         """Removes entries older than ttl_seconds to prevent memory growth."""
         expired_keys = [
-            key for key, timestamp in self._cache.items()
+            key
+            for key, timestamp in self._cache.items()
             if (current_time - timestamp) >= self.ttl_seconds
         ]
         for key in expired_keys:

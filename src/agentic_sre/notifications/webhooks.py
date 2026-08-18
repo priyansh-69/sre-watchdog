@@ -79,10 +79,14 @@ async def dispatch_alerts(
             slack_payload = format_slack_payload(crash_context, ai_rca)
             response = await http_client.post(target_slack_url, json=slack_payload)
             response.raise_for_status()
-            logger.info("[Agentic-SRE] Successfully dispatched RCA report to Slack webhook.")
+            logger.info(
+                "[Agentic-SRE] Successfully dispatched RCA report to Slack webhook."
+            )
         except Exception as exc:
             # Fail-Silent rule: log without raising exception
-            logger.error(f"[Agentic-SRE] Failed to dispatch Slack webhook: {exc}", exc_info=True)
+            logger.error(
+                f"[Agentic-SRE] Failed to dispatch Slack webhook: {exc}", exc_info=True
+            )
 
     # 2. Discord Dispatch (Independent try/except block)
     if target_discord_url:
@@ -90,7 +94,12 @@ async def dispatch_alerts(
             discord_payload = format_discord_payload(crash_context, ai_rca)
             response = await http_client.post(target_discord_url, json=discord_payload)
             response.raise_for_status()
-            logger.info("[Agentic-SRE] Successfully dispatched RCA report to Discord webhook.")
+            logger.info(
+                "[Agentic-SRE] Successfully dispatched RCA report to Discord webhook."
+            )
         except Exception as exc:
             # Fail-Silent rule: log without raising exception
-            logger.error(f"[Agentic-SRE] Failed to dispatch Discord webhook: {exc}", exc_info=True)
+            logger.error(
+                f"[Agentic-SRE] Failed to dispatch Discord webhook: {exc}",
+                exc_info=True,
+            )

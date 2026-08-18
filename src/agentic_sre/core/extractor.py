@@ -7,7 +7,6 @@ from starlette.requests import Request
 
 from agentic_sre.core.sanitizer import Sanitizer
 
-
 MAX_STACK_TRACE_CHARS = 8000
 MAX_STACK_TRACE_LINES = 150
 MAX_EXCEPTION_MSG_CHARS = 1000
@@ -28,7 +27,9 @@ SAFE_HEADER_ALLOWLIST = {
 
 
 def truncate_stack_trace(
-    stack_trace: str, max_chars: int = MAX_STACK_TRACE_CHARS, max_lines: int = MAX_STACK_TRACE_LINES
+    stack_trace: str,
+    max_chars: int = MAX_STACK_TRACE_CHARS,
+    max_lines: int = MAX_STACK_TRACE_LINES,
 ) -> str:
     """Intelligently truncates oversized stack traces while preserving top and bottom frames.
 
@@ -52,7 +53,10 @@ def truncate_stack_trace(
         stack_trace = "\n".join(head_lines) + truncated_msg + "\n".join(tail_lines)
 
         if len(stack_trace) > max_chars:
-            stack_trace = stack_trace[: max_chars - 100] + "\n\n... [TRUNCATED OVERSIZED STACK TRACE] ..."
+            stack_trace = (
+                stack_trace[: max_chars - 100]
+                + "\n\n... [TRUNCATED OVERSIZED STACK TRACE] ..."
+            )
 
     return stack_trace
 
@@ -105,7 +109,9 @@ class Extractor:
         try:
             raw_msg = str(exc)
         except Exception:
-            raw_msg = f"<{type(exc).__name__} object with broken __str__ implementation>"
+            raw_msg = (
+                f"<{type(exc).__name__} object with broken __str__ implementation>"
+            )
 
         if len(raw_msg) > MAX_EXCEPTION_MSG_CHARS:
             raw_msg = raw_msg[:MAX_EXCEPTION_MSG_CHARS] + " ... [TRUNCATED]"
